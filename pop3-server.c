@@ -17,6 +17,7 @@ typedef enum {
 	STATE_NONE,
 	STATE_READ_CMD,
 	STATE_WRITE_LIST,
+	STATE_WRITE_UIDL_LIST,
 	STATE_WRITE_MSG_HEADER,
 	STATE_WRITE_MSG,
 	STATE_BYE
@@ -215,6 +216,62 @@ process_command(Server *state, POP3State *pop3, Client *cli_state, size_t line_s
 		read_from_client(pop3, cli_state);
 
 		clear_message_list(pop3);
+	} else if (starts_with(pop3->read_buffer, "DELE ")) {
+		size_t n;
+
+		sscanf(pop3->read_buffer, "%*s %ld", &n);
+		load_message_list(pop3);
+
+		if (n > pop3->msg_list->length) {
+			write_to_client(pop3, cli_state, "-ERR\r\n");
+			read_from_client(pop3, cli_state);
+		} else {
+			char reply[256];
+			MessageRecord *rec = arrayGet(pop3->msg_list, n -1);
+
+			int status = unlink(rec->file_name);
+
+			if (status == 0) {
+				write_to_client(pop3, cli_state, "+OK Message deleted\r\n");
+			} else {
+				perror("Failed to delete message.");
+				
+				write_to_client(pop3, cli_state, "-ERR\r\n");
+			}
+
+			read_from_client(pop3, cli_state);
+		}
+
+		clear_message_list(pop3);
+	} else if (starts_with(pop3->read_buffer, "UIDL ")) {
+		//This is UIDL with arg.
+
+		size_t n;
+
+		sscanf(pop3->read_buffer, "%*s %ld", &n);
+		load_message_list(pop3);
+
+		if (n > pop3->msg_list->length) {
+			write_to_client(pop3, cli_state, "-ERR\r\n");
+			read_from_client(pop3, cli_state);
+		} else {
+			char reply[256];
+			MessageRecord *rec = arrayGet(pop3->msg_list, n -1);
+
+			snprintf(reply, sizeof(reply), "+OK %ld %s\r\n", n, rec->file_name);
+
+			write_to_client(pop3, cli_state, reply);
+			read_from_client(pop3, cli_state);
+		}
+
+		clear_message_list(pop3);
+	} else if (starts_with(pop3->read_buffer, "UIDL")) {
+		//This is UIDL without arg
+
+		load_message_list(pop3);
+		pop3->parse_state = STATE_WRITE_UIDL_LIST;
+		pop3->msg_index = 0;
+		write_to_client(pop3, cli_state, "+OK\r\n");
 	} else if (starts_with(pop3->read_buffer, "LIST")) {
 		load_message_list(pop3);
 		pop3->parse_state = STATE_WRITE_LIST;
@@ -228,8 +285,11 @@ process_command(Server *state, POP3State *pop3, Client *cli_state, size_t line_s
 
 		sscanf(pop3->read_buffer, "%*s %ld", &n);
 
-		if (n >= pop3->msg_list->length) {
+		load_message_list(pop3);
+
+		if (n > pop3->msg_list->length) {
 			write_to_client(pop3, cli_state, "-ERR\r\n");
+			read_from_client(pop3, cli_state);
 		} else {
 			pop3->msg_index = n - 1;
 
@@ -269,10 +329,30 @@ void on_write_completed(Server *state, Client *cli_state) {
 
 	if (pop3->parse_state == STATE_BYE) {
 		serverDisconnect(state, cli_state);
+	} else if (pop3->parse_state == STATE_WRITE_UIDL_LIST) {
+		if (pop3->msg_index == pop3->msg_list->length) {
+			//We are done writing the list
+			write_to_client(pop3, cli_state, ".\r\n");
+			clear_message_list(pop3);
+
+			//Start reading again.
+			pop3->parse_state = STATE_READ_CMD;
+			read_from_client(pop3, cli_state);
+		} else {
+			char reply[256];
+			MessageRecord *rec = arrayGet(pop3->msg_list, pop3->msg_index);
+			
+			snprintf(reply, sizeof(reply), "%ld %s\r\n", pop3->msg_index + 1, rec->file_name);
+
+			pop3->msg_index += 1;
+
+			write_to_client(pop3, cli_state, reply);
+		} 
 	} else if (pop3->parse_state == STATE_WRITE_LIST) {
 		if (pop3->msg_index == pop3->msg_list->length) {
 			//We are done writing the list
 			write_to_client(pop3, cli_state, ".\r\n");
+			clear_message_list(pop3);
 
 			//Start reading again.
 			pop3->parse_state = STATE_READ_CMD;
@@ -299,6 +379,7 @@ void on_write_completed(Server *state, Client *cli_state) {
 		MessageRecord *rec = arrayGet(pop3->msg_list, pop3->msg_index);
 
 		release_message_rec_resources(rec);
+		clear_message_list(pop3);
 
 		write_to_client(pop3, cli_state, "\r\n.\r\n");
 
