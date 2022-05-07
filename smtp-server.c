@@ -8,6 +8,9 @@
 #include <errno.h>
 #include "../Cute/String.h"
 #include "../SockFramework/socket-framework.h"
+#include <sys/time.h>
+
+#define MAX_COUNTER 100
 
 typedef enum {
 	STATE_NONE,
@@ -131,8 +134,18 @@ process_data(SMTPState *smtp, Client *cli_state) {
 		stringGetChar(smtp->data, smtp->data->length - 1) == '\n') {
 		
 		char path[256];
+		struct timeval tv;
 
-		sprintf(path, "mail/%d.eml", ++counter);
+		gettimeofday(&tv, NULL);
+
+		++counter;
+
+		if (counter > MAX_COUNTER) {
+			counter = 1;
+		}
+
+		//Create a unique file name.
+		sprintf(path, "mail/%ld-%d-%d.eml", tv.tv_sec, tv.tv_usec, counter);
 
 		FILE *mail_file = fopen(path, "w");
 
