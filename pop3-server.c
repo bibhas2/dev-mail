@@ -26,9 +26,7 @@ typedef enum {
 } ParseState;
 
 typedef struct {
-	int fd;
 	size_t file_size;
-	void *file_map;
 	char file_name[256];
 } MessageRecord;
 
@@ -37,6 +35,9 @@ typedef struct _POP3State {
 	char read_buffer[1024];
 	char write_buffer[1024];
 	size_t msg_index;
+	int fd;
+	void *file_map;
+	size_t map_size;
 } POP3State;
 
 int counter = 0;
@@ -66,9 +67,6 @@ MessageRecord *
 new_message_record(char *file_name) {
 	MessageRecord *rec = malloc(sizeof(MessageRecord));
 
-	rec->fd = -1;
-	rec->file_map = NULL;
-
 	snprintf(rec->file_name, sizeof(rec->file_name), "%s/%s", MAIL_DIR, file_name);
 
 	struct stat st;
@@ -83,40 +81,41 @@ new_message_record(char *file_name) {
 }
 
 void
-release_message_rec_resources(MessageRecord *rec) {
-	if (rec->file_map != NULL) {
-		int status = munmap(rec->file_map, rec->file_size);
+release_message_rec_resources(POP3State *pop3) {
+	if (pop3->file_map != NULL) {
+		int status = munmap(pop3->file_map, pop3->map_size);
 		assert(status == 0);
-		rec->file_map = NULL;
+		pop3->file_map = NULL;
+		pop3->map_size = 0;
 	}
-	if (rec->fd > 0) {
-		close(rec->fd);
+	if (pop3->fd > 0) {
+		close(pop3->fd);
 
-		rec->fd = -1;
+		pop3->fd = -1;
 	}
 }
 
 void
-acquire_message_rec_resources(MessageRecord *rec) {
-	release_message_rec_resources(rec);
+acquire_message_rec_resources(MessageRecord *rec, POP3State *pop3) {
+	release_message_rec_resources(pop3);
 
-	rec->fd = open(rec->file_name, O_RDONLY);
-	assert(rec->fd > 0);
+	pop3->fd = open(rec->file_name, O_RDONLY);
+	assert(pop3->fd > 0);
 
-	rec->file_map = mmap(
+	pop3->file_map = mmap(
 			NULL, rec->file_size, 
 			PROT_READ, MAP_SHARED,
-			rec->fd, 0);
+			pop3->fd, 0);
 
-	assert(rec->file_map != MAP_FAILED);
+	assert(pop3->file_map != MAP_FAILED);
+
+	pop3->map_size = rec->file_size;
 }
 
 void
 clear_message_list() {
 	for (int i = 0; i < msg_list->length; ++i) {
 		MessageRecord *rec = arrayGet(msg_list, i);
-
-		release_message_rec_resources(rec);
 
 		free(rec);
 
@@ -168,7 +167,10 @@ void on_connect(Server *state, Client *cli_state) {
 	POP3State *pop3 = (POP3State*) malloc(sizeof(POP3State));
 
 	pop3->parse_state = STATE_NONE;
-	
+	pop3->fd = -1;
+	pop3->file_map = NULL;
+	pop3->map_size = 0;
+
 	cli_state->data = pop3;
 
 	write_to_client(pop3, cli_state, "+OK POP3 example.com server ready\r\n");
@@ -183,6 +185,8 @@ void on_disconnect(Server *state, Client *cli_state) {
 
 	POP3State *pop3 = (POP3State*) cli_state->data;
 
+	release_message_rec_resources(pop3);
+	
 	free(pop3);
 }
 
@@ -357,15 +361,15 @@ void on_write_completed(Server *state, Client *cli_state) {
 	} else if (pop3->parse_state == STATE_WRITE_MSG_HEADER) {
 		MessageRecord *rec = arrayGet(msg_list, pop3->msg_index);
 
-		acquire_message_rec_resources(rec);
+		acquire_message_rec_resources(rec, pop3);
 
 		pop3->parse_state = STATE_WRITE_MSG;
 
-		clientScheduleWrite(cli_state, rec->file_map, rec->file_size);
+		clientScheduleWrite(cli_state, pop3->file_map, rec->file_size);
 	} else if (pop3->parse_state == STATE_WRITE_MSG) {
 		MessageRecord *rec = arrayGet(msg_list, pop3->msg_index);
 
-		release_message_rec_resources(rec);
+		release_message_rec_resources(pop3);
 
 		write_to_client(pop3, cli_state, "\r\n.\r\n");
 
