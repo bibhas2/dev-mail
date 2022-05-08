@@ -11,4 +11,4 @@ dev-smtp: $(OBJS) smtp-server.o
 dev-pop3: $(OBJS) pop3-server.o
 	gcc -o dev-pop3 pop3-server.o -L../SockFramework -L../Cute -L. -lsockf -lcute
 clean:
-	rm $(OBJS) dev-smtp
+	rm $(OBJS) dev-smtp dev-pop3 *.o
