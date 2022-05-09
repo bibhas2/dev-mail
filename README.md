@@ -7,7 +7,11 @@ Testing emails during development and testing can be challenging. It is common t
 Enter ``dev-mail``. This project provides an SMTP and POP3 server implementation. They are ideally suited for development and testing. 
 
 ## Building
-The software can be built in Linux or mac OS.
+The software can be built in Linux or mac OS. If you need to do a Linux build but do not have a Linux machine, then you can start a Docker container like this.
+
+```
+docker run --rm -v `pwd`:/usr/src -w /usr/src -it gcc
+```
 
 First clone the required projects.
 
