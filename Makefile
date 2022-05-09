@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-std=c99 -g
+CFLAGS=-std=gnu99 -g
 OBJS=
 
 all: dev-smtp dev-pop3
