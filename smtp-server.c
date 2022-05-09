@@ -35,7 +35,7 @@ int counter = 0;
 
 void
 init_server(Server* state) {
-	_info("Server loop is starting");
+	_info("Server loop is starting\n");
 
 	if (mkdir("mail", 0777) != 0 && errno != EEXIST) {
 		perror("Failed to create mail/ folder.");
@@ -63,7 +63,7 @@ read_from_client(SMTPState *smtp, Client *cli_state) {
 }
 
 void on_connect(Server *state, Client *cli_state) {
-	_info("Client connected %d", cli_state->fd);
+	_info("Client connected %d\n", cli_state->fd);
 
 	SMTPState *smtp = (SMTPState*) malloc(sizeof(SMTPState));
 
@@ -79,7 +79,7 @@ void on_connect(Server *state, Client *cli_state) {
 }
 
 void on_disconnect(Server *state, Client *cli_state) {
-	_info("Client disconnected %d", cli_state->fd);
+	_info("Client disconnected %d\n", cli_state->fd);
 
 	SMTPState *smtp = (SMTPState*) cli_state->data;
 
