@@ -12,6 +12,7 @@
 
 #define MAX_COUNTER 100
 #define _info printf
+#define SMTP_PORT 2525
 
 typedef enum {
 	STATE_NONE,
@@ -35,7 +36,7 @@ int counter = 0;
 
 void
 init_server(Server* state) {
-	_info("Server loop is starting\n");
+	_info("SMTP server started on port %d.\n", SMTP_PORT);
 
 	if (mkdir("mail", 0777) != 0 && errno != EEXIST) {
 		perror("Failed to create mail/ folder.");
@@ -196,7 +197,7 @@ void on_read_completed(Server *state, Client *cli_state) {
 }
 
 int main() {
-	Server *state = newServer(2525);
+	Server *state = newServer(SMTP_PORT);
 
 	state->on_loop_start = init_server;
 	state->on_client_connect = on_connect;
