@@ -34,15 +34,18 @@ cd ../dev-mail
 make
 ```
 
-## Running the SMTP Server
+## Running the Servers
 
-The SMTP server can be run as:
+The SMTP and POP3 server can be run as:
 
 ```
-./dev-smtp
+./dev-mail
 ```
 
-It will listen on port 2525.
+It will listen on ports:
+
+- 2525 for SMTP.
+- 1010 for POP3.
 
 You can connect to it with or without authentication. If you authenticate then you can supply any user ID and password.
 
@@ -50,19 +53,7 @@ E-mail messages are saved in the ``mail/`` folder. Developers can directly look 
 
 The SMTP server does not forward or relay the emails to anywhere. It is totally safe to send emails to any address during testing. These emails will never reach any actual users.
 
-## Running the POP3 Server
+POP3 delivers any email message found in the ``mail/`` folder.
 
-Run the POP3 server as follows.
-
-```
-./dev-pop3
-```
-
-It listens on port 1010.
-
-You can connect to it using any user ID and password. 
-
-It delivers any email message found in the ``mail/`` folder.
-
-It supports the mail delete command. That means testers can remotely delete messages using a client like Outlook. You can also manually delete the files in the ``mail/`` folder.
+The POP3 server supports the mail delete command. That means testers can remotely delete messages using a client like Outlook. You can also manually delete the files in the ``mail/`` folder.
 

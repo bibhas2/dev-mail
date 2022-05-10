@@ -14,6 +14,7 @@
 #include <fcntl.h>
 
 #define _info printf
+#define POP3_PORT 1010
 
 typedef enum {
 	STATE_NONE,
@@ -23,7 +24,7 @@ typedef enum {
 	STATE_WRITE_MSG_HEADER,
 	STATE_WRITE_MSG,
 	STATE_BYE
-} ParseState;
+} POPParseState;
 
 typedef struct {
 	size_t file_size;
@@ -31,7 +32,7 @@ typedef struct {
 } MessageRecord;
 
 typedef struct _POP3State {
-	ParseState parse_state;
+	POPParseState parse_state;
 	char read_buffer[1024];
 	char write_buffer[1024];
 	size_t msg_index;
@@ -40,12 +41,10 @@ typedef struct _POP3State {
 	size_t map_size;
 } POP3State;
 
-int counter = 0;
-char *MAIL_DIR = "mail";
-Array *msg_list;
+static char *MAIL_DIR = "mail";
+static Array *msg_list;
 
-void
-write_to_client(POP3State *pop3, Client *cli_state, char* line) {
+static void write_to_client(POP3State *pop3, Client *cli_state, char* line) {
 	_info("S: %s", line);
 
 	char *end = stpncpy(pop3->write_buffer, line, sizeof(pop3->write_buffer));
@@ -53,8 +52,7 @@ write_to_client(POP3State *pop3, Client *cli_state, char* line) {
 	clientScheduleWrite(cli_state, pop3->write_buffer, end - pop3->write_buffer);
 }
 
-void
-read_from_client(POP3State *pop3, Client *cli_state) {
+static void read_from_client(POP3State *pop3, Client *cli_state) {
 	memset(pop3->read_buffer, '\0', sizeof(pop3->read_buffer));
 	
 	int status = clientScheduleRead(cli_state, pop3->read_buffer, 
@@ -80,8 +78,7 @@ new_message_record(char *file_name) {
 	return rec;
 }
 
-void
-release_message_rec_resources(POP3State *pop3) {
+static void release_message_rec_resources(POP3State *pop3) {
 	if (pop3->file_map != NULL) {
 		int status = munmap(pop3->file_map, pop3->map_size);
 		assert(status == 0);
@@ -95,8 +92,7 @@ release_message_rec_resources(POP3State *pop3) {
 	}
 }
 
-void
-acquire_message_rec_resources(MessageRecord *rec, POP3State *pop3) {
+static void acquire_message_rec_resources(MessageRecord *rec, POP3State *pop3) {
 	release_message_rec_resources(pop3);
 
 	pop3->fd = open(rec->file_name, O_RDONLY);
@@ -112,8 +108,7 @@ acquire_message_rec_resources(MessageRecord *rec, POP3State *pop3) {
 	pop3->map_size = rec->file_size;
 }
 
-void
-clear_message_list() {
+static void clear_message_list() {
 	for (int i = 0; i < msg_list->length; ++i) {
 		MessageRecord *rec = arrayGet(msg_list, i);
 
@@ -125,8 +120,7 @@ clear_message_list() {
 	msg_list->length = 0;
 }
 
-void
-load_message_list() {
+static void load_message_list() {
 	clear_message_list();
 
 	DIR *dirp = opendir(MAIL_DIR);
@@ -152,16 +146,15 @@ load_message_list() {
 	closedir(dirp);
 }
 
-void
-init_server(Server* state) {
-	_info("Server loop is starting\n");
+static void init_server(Server* state) {
+	_info("POP3 server started on port %d.\n", POP3_PORT);
 
 	msg_list = newArray(10);
 
 	load_message_list();
 }
 
-void on_connect(Server *state, Client *cli_state) {
+static void on_connect(Server *state, Client *cli_state) {
 	_info("Client connected %d\n", cli_state->fd);
 
 	POP3State *pop3 = (POP3State*) malloc(sizeof(POP3State));
@@ -180,7 +173,7 @@ void on_connect(Server *state, Client *cli_state) {
 	read_from_client(pop3, cli_state);
 }
 
-void on_disconnect(Server *state, Client *cli_state) {
+static void on_disconnect(Server *state, Client *cli_state) {
 	_info("Client disconnected %d\n", cli_state->fd);
 
 	POP3State *pop3 = (POP3State*) cli_state->data;
@@ -190,12 +183,11 @@ void on_disconnect(Server *state, Client *cli_state) {
 	free(pop3);
 }
 
-bool starts_with(const char *str, const char *pre) {
+static bool starts_with(const char *str, const char *pre) {
     return strncmp(pre, str, strlen(pre)) == 0;
 }
 
-void
-process_command(Server *state, POP3State *pop3, Client *cli_state, size_t line_size) {
+static void process_command(Server *state, POP3State *pop3, Client *cli_state, size_t line_size) {
 	_info("C: %s", pop3->read_buffer);
 
 	if (starts_with(pop3->read_buffer, "USER")) {
@@ -302,7 +294,7 @@ process_command(Server *state, POP3State *pop3, Client *cli_state, size_t line_s
 	}
 }
 
-void on_read(Server *state, Client *cli_state, char *buff, size_t length) {
+static void on_read(Server *state, Client *cli_state, char *buff, size_t length) {
 	POP3State *pop3 = (POP3State*) cli_state->data;
 
 	if (pop3->parse_state == STATE_READ_CMD) {
@@ -317,7 +309,7 @@ void on_read(Server *state, Client *cli_state, char *buff, size_t length) {
 	}
 }
 
-void on_write_completed(Server *state, Client *cli_state) {
+static void on_write_completed(Server *state, Client *cli_state) {
 	POP3State *pop3 = (POP3State*) cli_state->data;
 
 	if (pop3->parse_state == STATE_BYE) {
@@ -379,17 +371,17 @@ void on_write_completed(Server *state, Client *cli_state) {
 	}
 }
 
-void on_timeout(Server *state) {
+static void on_timeout(Server *state) {
 	load_message_list();
 }
 
-void on_read_completed(Server *state, Client *cli_state) {
+static void on_read_completed(Server *state, Client *cli_state) {
 	//If we are still parsing request, keep reading
 	POP3State *pop3 = (POP3State*) cli_state->data;
 }
 
-int main() {
-	Server *state = newServer(1010);
+Server *create_pop3_server() {
+	Server *state = newServer(POP3_PORT);
 
 	state->on_loop_start = init_server;
 	state->on_timeout = on_timeout;
@@ -399,9 +391,8 @@ int main() {
 	state->on_read_completed = on_read_completed;
 	//state->on_write = on_write;
 	state->on_write_completed = on_write_completed;
-	state->idle_timeout = 15;
 
 	serverStart(state);
 
-	deleteServer(state);
+	return state;
 }

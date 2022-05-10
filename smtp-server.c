@@ -18,7 +18,7 @@ typedef enum {
 	STATE_NONE,
 	STATE_READ_CMD,
 	STATE_READ_DATA
-} ParseState;
+} SMTPParseState;
 
 /*
 From: https://www.ibm.com/docs/en/zos/2.3.0?topic=set-smtp-commands
@@ -26,16 +26,16 @@ The SMTP command lines must not exceed 510 characters in length.
 Data lines must not exceed 998 characters in length.
 */
 typedef struct _SMTPState {
-	ParseState parse_state;
+	SMTPParseState parse_state;
 	char read_buffer[1024];
 	char write_buffer[1024];
 	String *data;
 } SMTPState;
 
-int counter = 0;
+static int counter = 0;
+static char *MAIL_DIR = "mail";
 
-void
-init_server(Server* state) {
+static void init_server(Server* state) {
 	_info("SMTP server started on port %d.\n", SMTP_PORT);
 
 	if (mkdir("mail", 0777) != 0 && errno != EEXIST) {
@@ -44,8 +44,7 @@ init_server(Server* state) {
 	}
 }
 
-void
-write_to_client(SMTPState *smtp, Client *cli_state, char* line) {
+static void write_to_client(SMTPState *smtp, Client *cli_state, char* line) {
 	_info("S: %s", line);
 
 	char *end = stpncpy(smtp->write_buffer, line, sizeof(smtp->write_buffer));
@@ -53,8 +52,7 @@ write_to_client(SMTPState *smtp, Client *cli_state, char* line) {
 	clientScheduleWrite(cli_state, smtp->write_buffer, end - smtp->write_buffer);
 }
 
-void
-read_from_client(SMTPState *smtp, Client *cli_state) {
+static void read_from_client(SMTPState *smtp, Client *cli_state) {
 	memset(smtp->read_buffer, '\0', sizeof(smtp->read_buffer));
 	
 	int status = clientScheduleRead(cli_state, smtp->read_buffer, 
@@ -63,7 +61,7 @@ read_from_client(SMTPState *smtp, Client *cli_state) {
 	assert(status == 0);
 }
 
-void on_connect(Server *state, Client *cli_state) {
+static void on_connect(Server *state, Client *cli_state) {
 	_info("Client connected %d\n", cli_state->fd);
 
 	SMTPState *smtp = (SMTPState*) malloc(sizeof(SMTPState));
@@ -79,7 +77,7 @@ void on_connect(Server *state, Client *cli_state) {
 	read_from_client(smtp, cli_state);
 }
 
-void on_disconnect(Server *state, Client *cli_state) {
+static void on_disconnect(Server *state, Client *cli_state) {
 	_info("Client disconnected %d\n", cli_state->fd);
 
 	SMTPState *smtp = (SMTPState*) cli_state->data;
@@ -93,8 +91,7 @@ bool starts_with(const char *str, const char *pre) {
     return strncmp(pre, str, strlen(pre)) == 0;
 }
 
-void
-process_command(SMTPState *smtp, Client *cli_state) {
+static void process_command(SMTPState *smtp, Client *cli_state) {
 	_info("C: %s", smtp->read_buffer);
 
 	if (starts_with(smtp->read_buffer, "HELO")) {
@@ -123,8 +120,7 @@ process_command(SMTPState *smtp, Client *cli_state) {
 	}
 }
 
-void
-process_data(SMTPState *smtp, Client *cli_state) {
+static void process_data(SMTPState *smtp, Client *cli_state) {
 	if (smtp->data->length < 5) {
 		return;
 	}
@@ -147,7 +143,7 @@ process_data(SMTPState *smtp, Client *cli_state) {
 		}
 
 		//Create a unique file name.
-		sprintf(path, "mail/%ld-%d-%d.eml", tv.tv_sec, tv.tv_usec, counter);
+		sprintf(path, "%s/%ld-%d-%d.eml", MAIL_DIR, tv.tv_sec, tv.tv_usec, counter);
 
 		FILE *mail_file = fopen(path, "w");
 
@@ -165,7 +161,7 @@ process_data(SMTPState *smtp, Client *cli_state) {
 	}
 }
 
-void on_read(Server *state, Client *cli_state, char *buff, size_t length) {
+static void on_read(Server *state, Client *cli_state, char *buff, size_t length) {
 	SMTPState *smtp = (SMTPState*) cli_state->data;
 
 	if (smtp->parse_state == STATE_READ_CMD) {
@@ -183,11 +179,11 @@ void on_read(Server *state, Client *cli_state, char *buff, size_t length) {
 	}
 }
 
-void on_write_completed(Server *state, Client *cli_state) {
+static void on_write_completed(Server *state, Client *cli_state) {
 	SMTPState *smtp = (SMTPState*) cli_state->data;
 }
 
-void on_read_completed(Server *state, Client *cli_state) {
+static void on_read_completed(Server *state, Client *cli_state) {
 	//If we are still parsing request, keep reading
 	SMTPState *smtp = (SMTPState*) cli_state->data;
 
@@ -196,7 +192,7 @@ void on_read_completed(Server *state, Client *cli_state) {
 	}
 }
 
-int main() {
+Server *create_smtp_server() {
 	Server *state = newServer(SMTP_PORT);
 
 	state->on_loop_start = init_server;
@@ -209,5 +205,5 @@ int main() {
 
 	serverStart(state);
 
-	deleteServer(state);
+	return state;
 }
