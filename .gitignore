@@ -1,4 +1,3 @@
 mail/
 *.o
-dev-pop3
-dev-smtp
+dev-mail
