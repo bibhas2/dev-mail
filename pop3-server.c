@@ -378,6 +378,12 @@ static void on_timeout(Server *state) {
 static void on_read_completed(Server *state, Client *cli_state) {
 	//If we are still parsing request, keep reading
 	POP3State *pop3 = (POP3State*) cli_state->data;
+
+	if (pop3->parse_state == STATE_READ_CMD) {
+		//This should not happen. 
+		_info("Command line is too long. Disconnecting client.\n");
+		serverDisconnect(state, cli_state);
+	}
 }
 
 Server *create_pop3_server() {

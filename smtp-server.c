@@ -189,6 +189,10 @@ static void on_read_completed(Server *state, Client *cli_state) {
 
 	if (smtp->parse_state == STATE_READ_DATA) {
 		read_from_client(smtp, cli_state);
+	} else if (smtp->parse_state == STATE_READ_CMD) {
+		//This should not happen. 
+		_info("Command line is too long. Disconnecting client.\n");
+		serverDisconnect(state, cli_state);
 	}
 }
 
