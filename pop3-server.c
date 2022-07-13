@@ -29,6 +29,7 @@ typedef enum {
 typedef struct {
 	size_t file_size;
 	char file_name[256];
+	bool delete_later;
 } MessageRecord;
 
 typedef struct _POP3State {
@@ -49,6 +50,8 @@ static void write_to_client(POP3State *pop3, Client *cli_state, char* line) {
 
 	char *end = stpncpy(pop3->write_buffer, line, sizeof(pop3->write_buffer));
 
+	clientCancelWrite(cli_state);
+	
 	clientScheduleWrite(cli_state, pop3->write_buffer, end - pop3->write_buffer);
 }
 
@@ -74,6 +77,7 @@ new_message_record(char *file_name) {
 	assert(status == 0);
 
 	rec->file_size = st.st_size;
+	rec->delete_later = false;
 
 	return rec;
 }
@@ -140,10 +144,26 @@ static void load_message_list() {
 
 		MessageRecord *rec = new_message_record(de->d_name);
 
+		_info("Found mail file: %s\n", rec->file_name);
+
 		arrayAdd(msg_list, rec);
 	}
 	
 	closedir(dirp);
+}
+
+static void clean_deleted_messages() {
+	for (int i = 0; i < msg_list->length; ++i) {
+		MessageRecord *rec = arrayGet(msg_list, i);
+
+		if (rec->delete_later) {
+			int status = unlink(rec->file_name);
+
+			if (status < 0) {
+				_info("Failed to remove file: %s\n", rec->file_name);
+			}
+		}
+	}
 }
 
 static void init_server(Server* state) {
@@ -197,6 +217,8 @@ static void process_command(Server *state, POP3State *pop3, Client *cli_state, s
 		write_to_client(pop3, cli_state, "+OK Mailbox open\r\n");
 		read_from_client(pop3, cli_state);
 	} else if (starts_with(pop3->read_buffer, "STAT")) {
+		load_message_list();
+
 		size_t sz = 0;
 
 		for (int i = 0; i < msg_list->length; ++i) {
@@ -220,18 +242,11 @@ static void process_command(Server *state, POP3State *pop3, Client *cli_state, s
 			write_to_client(pop3, cli_state, "-ERR\r\n");
 			read_from_client(pop3, cli_state);
 		} else {
-			char reply[256];
-			MessageRecord *rec = arrayGet(msg_list, n -1);
+			MessageRecord *rec = arrayGet(msg_list, n - 1);
 
-			int status = unlink(rec->file_name);
+			rec->delete_later = true;
 
-			if (status == 0) {
-				write_to_client(pop3, cli_state, "+OK Message deleted\r\n");
-			} else {
-				perror("Failed to delete message.");
-
-				write_to_client(pop3, cli_state, "-ERR\r\n");
-			}
+			write_to_client(pop3, cli_state, "+OK Message deleted\r\n");
 
 			read_from_client(pop3, cli_state);
 		}
@@ -372,7 +387,7 @@ static void on_write_completed(Server *state, Client *cli_state) {
 }
 
 static void on_timeout(Server *state) {
-	load_message_list();
+	clean_deleted_messages();
 }
 
 static void on_read_completed(Server *state, Client *cli_state) {
