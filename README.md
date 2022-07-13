@@ -7,11 +7,13 @@ Testing emails during development and testing can be challenging. It is common t
 Enter ``dev-mail``. This project provides an SMTP and POP3 server implementation. They are ideally suited for development and testing. 
 
 ## Building
-The software can be built in Linux or mac OS. If you need to do a Linux build but do not have a Linux machine, then you can start a Docker container like this.
+The software can be built in Linux or mac OS. 
 
-```
-docker run --rm -v `pwd`:/usr/src -w /usr/src -it gcc
-```
+>If you need to do a Linux build but do not have a Linux machine, then you can start a Docker container like this.
+>
+>```
+>docker run --rm -v `pwd`:/usr/src -w /usr/src -it gcc
+>```
 
 First clone the required projects.
 
@@ -47,13 +49,16 @@ It will listen on ports:
 - 2525 for SMTP.
 - 1010 for POP3.
 
+### About Client Authentication
 You can connect to it with or without authentication. If you authenticate then you can supply any user ID and password.
 
+### About the SMTP Server
 E-mail messages are saved in the ``mail/`` folder. Developers can directly look at these mail files. During system testing by testers, it may be easier to pull these emails from Outlook or similar clients using POP3.
 
 The SMTP server does not forward or relay the emails to anywhere. It is totally safe to send emails to any address during testing. These emails will never reach any actual users.
 
-POP3 delivers any email message found in the ``mail/`` folder.
+### About the POP3 Server
+POP3 delivers any email message found in the ``mail/`` folder. This means, you can also manually export mail messages from Outlook and drop those files in the ``mail/`` folder. The POP3 server will deliver those messages.
 
 The POP3 server supports the mail delete command. That means testers can remotely delete messages using a client like Outlook. You can also manually delete the files in the ``mail/`` folder.
 
