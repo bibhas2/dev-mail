@@ -283,7 +283,7 @@ static void process_command(Server *state, POP3State *pop3, Client *cli_state, s
 	} else if (starts_with(pop3->read_buffer, "QUIT")) {
 		write_to_client(pop3, cli_state, "+OK Bye\r\n");
 		pop3->parse_state = STATE_BYE;
-	} else if (starts_with(pop3->read_buffer, "RETR")) {
+	} else if (starts_with(pop3->read_buffer, "RETR") || starts_with(pop3->read_buffer, "TOP")) {
 		size_t n;
 
 		sscanf(pop3->read_buffer, "%*s %ld", &n);
@@ -304,7 +304,7 @@ static void process_command(Server *state, POP3State *pop3, Client *cli_state, s
 			pop3->parse_state = STATE_WRITE_MSG_HEADER;
 		}
 	} else {
-		_info("Unknown command.");
+		_info("Unknown command.\n");
 		write_to_client(pop3, cli_state, "-ERR\r\n");
 		read_from_client(pop3, cli_state);
 	}
