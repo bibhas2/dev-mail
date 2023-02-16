@@ -20,6 +20,8 @@ typedef enum {
 	STATE_READ_CMD,
 	STATE_WRITE_LIST,
 	STATE_WRITE_UIDL_LIST,
+	STATE_WRITE_RETR_HEADER,
+	STATE_WRITE_TOP_HEADER,
 	STATE_WRITE_MSG_HEADER,
 	STATE_WRITE_MSG,
 	STATE_BYE
@@ -283,7 +285,7 @@ static void process_command(Server *state, POP3State *pop3, Client *cli_state, s
 	} else if (starts_with(pop3->read_buffer, "QUIT")) {
 		write_to_client(pop3, cli_state, "+OK Bye\r\n");
 		pop3->parse_state = STATE_BYE;
-	} else if (starts_with(pop3->read_buffer, "RETR") || starts_with(pop3->read_buffer, "TOP")) {
+	} else if (starts_with(pop3->read_buffer, "RETR")) {
 		size_t n;
 
 		sscanf(pop3->read_buffer, "%*s %ld", &n);
@@ -301,7 +303,26 @@ static void process_command(Server *state, POP3State *pop3, Client *cli_state, s
 
 			write_to_client(pop3, cli_state, reply);
 
-			pop3->parse_state = STATE_WRITE_MSG_HEADER;
+			pop3->parse_state = STATE_WRITE_RETR_HEADER;
+		}
+	} else if (starts_with(pop3->read_buffer, "TOP")) {
+		size_t n;
+
+		sscanf(pop3->read_buffer, "%*s %ld", &n);
+
+		if (n > msg_list->length) {
+			write_to_client(pop3, cli_state, "-ERR\r\n");
+			read_from_client(pop3, cli_state);
+		} else {
+			pop3->msg_index = n - 1;
+
+			char reply[256];
+
+			snprintf(reply, sizeof(reply), "+OK top of message follows\r\n");
+
+			write_to_client(pop3, cli_state, reply);
+
+			pop3->parse_state = STATE_WRITE_TOP_HEADER;
 		}
 	} else {
 		_info("Unknown command.\n");
@@ -366,7 +387,7 @@ static void on_write_completed(Server *state, Client *cli_state) {
 
 			write_to_client(pop3, cli_state, reply);
 		} 
-	} else if (pop3->parse_state == STATE_WRITE_MSG_HEADER) {
+	} else if (pop3->parse_state == STATE_WRITE_RETR_HEADER) {
 		MessageRecord *rec = arrayGet(msg_list, pop3->msg_index);
 
 		acquire_message_rec_resources(rec, pop3);
@@ -374,7 +395,30 @@ static void on_write_completed(Server *state, Client *cli_state) {
 		pop3->parse_state = STATE_WRITE_MSG;
 
 		clientScheduleWrite(cli_state, pop3->file_map, rec->file_size);
-	} else if (pop3->parse_state == STATE_WRITE_MSG) {
+	} else if (pop3->parse_state == STATE_WRITE_TOP_HEADER) {
+		MessageRecord *rec = arrayGet(msg_list, pop3->msg_index);
+
+		acquire_message_rec_resources(rec, pop3);
+
+		//Find out where header ends
+		size_t pos = 0;
+
+		while (pos < rec->file_size) {
+			if (pos >= 3) {
+				const char* file_buffer = pop3->file_map;
+
+				if ((file_buffer[pos - 3] == '\r') && (file_buffer[pos - 2] == '\n') && (file_buffer[pos - 1] == '\r') && (file_buffer[pos] == '\n')) {
+					break;
+				}
+			}
+
+			++pos;
+		}
+
+		pop3->parse_state = STATE_WRITE_MSG_HEADER;
+
+		clientScheduleWrite(cli_state, pop3->file_map, pos + 1);		
+	} else if (pop3->parse_state == STATE_WRITE_MSG || pop3->parse_state == STATE_WRITE_MSG_HEADER) {
 		MessageRecord *rec = arrayGet(msg_list, pop3->msg_index);
 
 		release_message_rec_resources(pop3);
