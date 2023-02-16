@@ -44,16 +44,22 @@ The SMTP and POP3 server can be run as:
 ./dev-mail
 ```
 
-It will listen on ports:
+By default, will listen on ports:
 
 - 2525 for SMTP.
-- 1010 for POP3.
+- 1100 for POP3.
+
+Optionally, you can supply different port numbers.
+
+```
+./dev-mail --pop3-port 110 --smtp-port 25 
+```
 
 ### About Client Authentication
 You can connect to it with or without authentication. If you authenticate then you can supply any user ID and password.
 
 ### About the SMTP Server
-E-mail messages are saved in the ``mail/`` folder. Developers can directly look at these mail files. During system testing by testers, it may be easier to pull these emails from Outlook or similar clients using POP3.
+E-mail messages are saved in the ``mail/`` folder. You can pull these emails using a POP3 client like Outlook. Developers can also directly look at these mail files.
 
 The SMTP server does not forward or relay the emails to anywhere. It is totally safe to send emails to any address during testing. These emails will never reach any actual users.
 

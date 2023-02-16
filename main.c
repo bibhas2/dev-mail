@@ -4,13 +4,46 @@
 #include <unistd.h>
 #include <assert.h>
 #include "../SockFramework/socket-framework.h"
+#define SMTP_PORT 2525
+#define POP3_PORT 1100
 
-Server *create_smtp_server();
-Server *create_pop3_server();
+Server *create_smtp_server(int port);
+Server *create_pop3_server(int port);
 
-int main() {
-	Server *smtp = create_smtp_server();
-    Server *pop3 = create_pop3_server();
+char* get_next_arg(int argc, char *argv[], int *pos) {
+    if (*pos > (argc - 1)) {
+        return NULL;
+    }
+
+    *pos += 1;
+
+    return argv[*pos];
+}
+
+void get_next_arg_int(int argc, char *argv[], int* pos, int* value) {
+    char *p = get_next_arg(argc, argv, pos);
+
+    if (p != NULL) {
+        *value = atoi(p);
+    }
+}
+
+int main(int argc, char *argv[]) {
+    int pos = 0;
+    char* arg = NULL;
+    int pop3_port = POP3_PORT;
+    int smtp_port = SMTP_PORT;
+
+    while ((arg = get_next_arg(argc, argv, &pos)) != NULL) {
+        if (strcmp(arg, "--pop3-port") == 0) {
+            get_next_arg_int(argc, argv, &pos, &pop3_port);
+        } else if (strcmp(arg, "--smtp-port") == 0) {
+            get_next_arg_int(argc, argv, &pos, &smtp_port);
+        }
+    }
+
+	Server *smtp = create_smtp_server(smtp_port);
+    Server *pop3 = create_pop3_server(pop3_port);
     EventLoop loop;
 
 	loopInit(&loop);

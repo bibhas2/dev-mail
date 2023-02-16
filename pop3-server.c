@@ -14,7 +14,6 @@
 #include <fcntl.h>
 
 #define _info printf
-#define POP3_PORT 1010
 
 typedef enum {
 	STATE_NONE,
@@ -162,12 +161,14 @@ static void clean_deleted_messages() {
 			if (status < 0) {
 				_info("Failed to remove file: %s\n", rec->file_name);
 			}
+
+			rec->delete_later = false;
 		}
 	}
 }
 
 static void init_server(Server* state) {
-	_info("POP3 server started on port %d.\n", POP3_PORT);
+	_info("POP3 server started on port %d.\n", state->port);
 
 	msg_list = newArray(10);
 
@@ -387,7 +388,9 @@ static void on_write_completed(Server *state, Client *cli_state) {
 }
 
 static void on_timeout(Server *state) {
+	//We delete message files asynchronously on a timeout.
 	clean_deleted_messages();
+	clear_message_list();
 }
 
 static void on_read_completed(Server *state, Client *cli_state) {
@@ -401,8 +404,8 @@ static void on_read_completed(Server *state, Client *cli_state) {
 	}
 }
 
-Server *create_pop3_server() {
-	Server *state = newServer(POP3_PORT);
+Server *create_pop3_server(int port) {
+	Server *state = newServer(port);
 
 	state->on_loop_start = init_server;
 	state->on_timeout = on_timeout;
