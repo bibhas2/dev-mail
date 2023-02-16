@@ -414,12 +414,10 @@ static void on_write_completed(Server *state, Client *cli_state) {
 
 			++pos;
 		}
-		
-		_info("Header ends at %u for %u\n", pos, pop3->msg_index);
 
 		pop3->parse_state = STATE_WRITE_MSG_HEADER;
 
-		clientScheduleWrite(cli_state, pop3->file_map, rec->file_size > 1024 ? 1024 : rec->file_size /*pos + 1*/);		
+		clientScheduleWrite(cli_state, pop3->file_map, *pos + 1);		
 	} else if (pop3->parse_state == STATE_WRITE_MSG || pop3->parse_state == STATE_WRITE_MSG_HEADER) {
 		MessageRecord *rec = arrayGet(msg_list, pop3->msg_index);
 
