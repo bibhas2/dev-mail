@@ -11,7 +11,8 @@
 #include <sys/time.h>
 
 #define MAX_COUNTER 100
-#define _info printf
+
+void _info(const char* format, ...);
 
 typedef enum {
 	STATE_NONE,

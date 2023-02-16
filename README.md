@@ -44,7 +44,7 @@ The SMTP and POP3 server can be run as:
 ./dev-mail
 ```
 
-By default, will listen on ports:
+By default, the server will listen on ports:
 
 - 2525 for SMTP.
 - 1100 for POP3.
@@ -53,6 +53,12 @@ Optionally, you can supply different port numbers.
 
 ```
 ./dev-mail --pop3-port 110 --smtp-port 25 
+```
+
+By default, the server logs verbose messages on standard output. You can disable that.
+
+```
+./dev-mail --quiet
 ```
 
 ### About Client Authentication

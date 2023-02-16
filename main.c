@@ -3,12 +3,15 @@
 #include <string.h>
 #include <unistd.h>
 #include <assert.h>
+#include <stdarg.h>
 #include "../SockFramework/socket-framework.h"
 #define SMTP_PORT 2525
 #define POP3_PORT 1100
 
 Server *create_smtp_server(int port);
 Server *create_pop3_server(int port);
+
+static int quiet = 0;
 
 char* get_next_arg(int argc, char *argv[], int *pos) {
     if (*pos > (argc - 1)) {
@@ -28,6 +31,20 @@ void get_next_arg_int(int argc, char *argv[], int* pos, int* value) {
     }
 }
 
+void _info(const char* format, ...) {
+    if (quiet == 1) {
+        return;
+    }
+
+    va_list argptr;
+
+    va_start(argptr, format);
+
+    vprintf(format, argptr);
+
+    va_end(argptr);
+}
+
 int main(int argc, char *argv[]) {
     int pos = 0;
     char* arg = NULL;
@@ -39,6 +56,8 @@ int main(int argc, char *argv[]) {
             get_next_arg_int(argc, argv, &pos, &pop3_port);
         } else if (strcmp(arg, "--smtp-port") == 0) {
             get_next_arg_int(argc, argv, &pos, &smtp_port);
+        } else if (strcmp(arg, "--quiet") == 0) {
+            quiet = 1;
         }
     }
 

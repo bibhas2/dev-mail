@@ -13,7 +13,7 @@
 #include <dirent.h>
 #include <fcntl.h>
 
-#define _info printf
+void _info(const char* format, ...);
 
 typedef enum {
 	STATE_NONE,
