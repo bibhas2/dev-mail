@@ -1,10 +1,10 @@
 # SMTP and POP3 Server for Development and Testing
-Testing emails during development and testing can be challenging. It is common to use tools like the [Fake SMTP Server](http://nilhcem.com/FakeSMTP/) for this. There are a few problems with these:
+Testing emails during development and testing can be challenging. It is common to use tools like the [Fake SMTP Server](http://nilhcem.com/FakeSMTP/) for this. There are a few problems with these tool:
 
 - They lack any POP3 or IMAP support. Which makes it harder for the testers to look at the emails remotely from their desktops. It will be much easier if a client like Outlook could fetch these emails.
 - Some of them have GUI. This makes it harder to run the servers in background as a service.
 
-Enter ``dev-mail``. This project provides an SMTP and POP3 server implementation. They are ideally suited for development and testing. 
+Enter ``dev-mail``. This project provides an SMTP and POP3 server implementation. It requires no authentication and doesn't forward mails anywhere. This makes ``dev-mail`` well suited for development and testing. 
 
 ## Building
 The software can be built in Linux or mac OS. 
@@ -14,6 +14,8 @@ The software can be built in Linux or mac OS.
 >```
 >docker run --rm -v `pwd`:/usr/src -w /usr/src -it gcc
 >```
+>
+>Then following the steps below.
 
 First clone the required projects.
 
@@ -61,6 +63,50 @@ By default, the server logs verbose messages on standard output. You can disable
 ./dev-mail --quiet
 ```
 
+### Setup a Systemd Service
+In the ``/etc/systemd/system`` folder create a file called ``dev-mail.service``.
+
+Add these lines. Change the path to the executable in ``ExecStart`` as needed.
+
+```
+[Unit]
+Description=Developer Mail Server
+[Service]
+Type=simple
+ExecStart=/path/to/dev-mail
+Restart=on-failure
+RestartSec=10
+KillMode=process
+[Install]
+WantedBy=multi-user.target
+```
+
+Run these commands to enable the service.
+
+```
+sudo systemctl daemon-reload
+sudo systemctl enable dev-mail
+```
+
+Finally, start the service.
+
+```
+sudo systemctl start dev-mail
+```
+
+Verify that the program is running.
+
+```
+sudo systemctl status dev-mail
+```
+
+You can debug any startup issues using this command.
+
+```
+sudo journalctl -f -a -u dev-mail
+```
+
+## More Details
 ### About Client Authentication
 You can connect to it with or without authentication. If you authenticate then you can supply any user ID and password.
 
