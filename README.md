@@ -1,5 +1,5 @@
 # SMTP and POP3 Server for Development and Testing
-Testing emails during development and testing can be challenging. It is common to use tools like the [Fake SMTP Server](http://nilhcem.com/FakeSMTP/) for this. There are a few problems with these tool:
+Testing emails during development and testing can be challenging. It is common to use tools like the [Fake SMTP Server](http://nilhcem.com/FakeSMTP/) for this. There are a few problems with these tools:
 
 - They lack any POP3 or IMAP support. Which makes it harder for the testers to look at the emails remotely from their desktops. It will be much easier if a client like Outlook could fetch these emails.
 - Some of them have GUI. This makes it harder to run the servers in background as a service.
@@ -9,13 +9,13 @@ Enter ``dev-mail``. This project provides an SMTP and POP3 server implementation
 ## Building
 The software can be built in Linux or mac OS. 
 
->If you need to do a Linux build but do not have a Linux machine, then you can start a Docker container like this.
+>**A side note:** If you need to do a Linux build but do not have a Linux machine, then you can start a Docker container like this.
 >
 >```
 >docker run --rm -v `pwd`:/usr/src -w /usr/src -it gcc
 >```
 >
->Then following the steps below.
+>Then, follow the steps below.
 
 First clone the required projects.
 
