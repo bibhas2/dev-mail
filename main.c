@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <assert.h>
 #include <stdarg.h>
+#include <signal.h>
 #include "../SockFramework/socket-framework.h"
 #define SMTP_PORT 2525
 #define POP3_PORT 1100
@@ -45,6 +46,12 @@ void _info(const char* format, ...) {
     va_end(argptr);
 }
 
+EventLoop loop;
+
+void handle_term(int signum) {
+    loopEnd(&loop);
+}
+
 int main(int argc, char *argv[]) {
     int pos = 0;
     char* arg = NULL;
@@ -61,9 +68,10 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    signal(SIGTERM, handle_term);
+
 	Server *smtp = create_smtp_server(smtp_port);
     Server *pop3 = create_pop3_server(pop3_port);
-    EventLoop loop;
 
 	loopInit(&loop);
 
@@ -73,6 +81,8 @@ int main(int argc, char *argv[]) {
     loopAddServer(&loop, pop3);
     
     loopStart(&loop);
+
+    _info("Received SIGTERM. Shutting down.\n");
 
 	deleteServer(smtp);
     deleteServer(pop3);
